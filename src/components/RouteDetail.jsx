@@ -1,3 +1,5 @@
+import { motion } from 'framer-motion'
+import CountUpScore from './CountUpScore'
 import './RouteDetail.css'
 
 export default function RouteDetail({ route, onClose }) {
@@ -7,8 +9,16 @@ export default function RouteDetail({ route, onClose }) {
     ? scoreBreakdown.map(b => `${b.name}×${(b.weight * 100).toFixed(0)}%`).join(' + ')
     : ''
 
+  const glow = score != null ? (score >= 80 ? 'cyan' : score < 60 ? 'amber' : null) : null
+
   return (
-    <aside className="detail">
+    <motion.aside
+      className="detail"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+    >
       <div className="detail-header">
         <h2 className="detail-title">{fromCode || from} → {toCode || to}</h2>
         <button type="button" className="detail-close" onClick={onClose} aria-label="Close">×</button>
@@ -19,7 +29,12 @@ export default function RouteDetail({ route, onClose }) {
       {carrierName && <p className="detail-carrier">Airline: {carrierName}</p>}
       {score != null && (
         <div className="detail-score-box">
-          <span className="detail-score-num" style={{ color: grade?.color }}>{score}</span>
+          <CountUpScore
+            value={score}
+            color={grade?.color}
+            glow={glow}
+            className="detail-score-num"
+          />
           <span className="detail-grade" style={{ color: grade?.color }}>{grade?.label}</span>
         </div>
       )}
@@ -44,7 +59,7 @@ export default function RouteDetail({ route, onClose }) {
                 </div>
                 <div className="breakdown-desc">{b.desc}</div>
                 <div className="breakdown-math">
-                  Score {b.score} × weight {b.weight * 100}% = <strong>{b.contribution}</strong> pts
+                  Score {b.score} × weight {Math.round(b.weight * 100)}% = <strong>{b.contribution}</strong> pts
                 </div>
               </li>
             ))}
@@ -64,9 +79,9 @@ export default function RouteDetail({ route, onClose }) {
           {count != null && <li>Flights: <strong>{count}</strong> (selected month)</li>}
         </ul>
         <p className="detail-note">
-          {route.carrier ? 'On-time, delay, and cancellation rates are from this airline on this route.' : 'On-time is from annual airport data.'} Flight count varies by selected month; score is recalculated with that month’s weight.
+          {route.carrier ? 'On-time, delay, and cancellation rates are from this airline on this route.' : 'On-time is from annual airport data.'} Flight count varies by selected month; score is recalculated with that month's weight.
         </p>
       </div>
-    </aside>
+    </motion.aside>
   )
 }

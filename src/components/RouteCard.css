@@ -1,27 +1,61 @@
 .route-card {
+  position: relative;
   padding: 18px 20px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid transparent;
   border-radius: var(--radius);
   cursor: pointer;
-  transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
-  box-shadow: var(--shadow);
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  background-image: linear-gradient(rgba(255,255,255,0.03), rgba(255,255,255,0.03)),
+    linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%, rgba(255,255,255,0.04) 100%);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
 }
 
 .route-card:hover {
-  background: var(--surface-hover);
-  border-color: var(--border);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  background-image: linear-gradient(rgba(255,255,255,0.05), rgba(255,255,255,0.05)),
+    linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 50%, rgba(255,255,255,0.06) 100%);
 }
 
 .route-card.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
-  background: var(--surface);
+  border-color: rgba(34, 211, 238, 0.4);
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.15);
 }
 
 .route-card:focus-visible {
   outline-offset: 2px;
+}
+
+/* Glare sweep effect */
+.route-card-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-position: 200% 0;
+  transition: opacity 0.3s ease;
+}
+
+.route-card-glare[data-hover="true"] {
+  opacity: 1;
+  animation: glareSweep 0.6s ease-out forwards;
+}
+
+@keyframes glareSweep {
+  from { background-position: -100% 0; }
+  to { background-position: 200% 0; }
 }
 
 .route-card-head {
@@ -44,6 +78,7 @@
   font-size: 1.35rem;
   min-width: 2ch;
   text-align: right;
+  display: inline-block;
 }
 
 .route-card-meta {
@@ -67,19 +102,12 @@
   font-size: 0.8rem;
   color: var(--text-muted);
   padding: 4px 10px;
-  background: var(--bg-subtle);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   white-space: nowrap;
 }
 
 .route-card.selected .route-card-metrics span {
-  background: var(--surface-hover);
-}
-
-.grade-badge {
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
 }

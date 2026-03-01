@@ -3,6 +3,7 @@ import { processRoutes, getGrade } from './data/routes'
 import RouteCard from './components/RouteCard'
 import RouteDetail from './components/RouteDetail'
 import Header from './components/Header'
+import FilterWithBorderBeam from './components/FilterWithBorderBeam'
 import './App.css'
 
 const DATA_BASE = '/data'
@@ -25,6 +26,7 @@ function App() {
   const [filterFrom, setFilterFrom] = useState('')
   const [filterTo, setFilterTo] = useState('')
   const [filterAirline, setFilterAirline] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     Promise.all([
@@ -98,9 +100,19 @@ function App() {
 
   const selected = selectedId ? filteredAndSorted.find(r => r.id === selectedId) : null
 
+  const PAGE_SIZE = 80
+  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / PAGE_SIZE))
+  const startIndex = (currentPage - 1) * PAGE_SIZE
+  const displayedRoutes = filteredAndSorted.slice(startIndex, startIndex + PAGE_SIZE)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterPeriod, filterFrom, filterTo, filterAirline, sortBy, order])
+
   if (loading) {
     return (
       <div className="app">
+        <div className="app-bg" aria-hidden />
         <Header />
         <main className="main">
           <div className="loading-wrap" role="status" aria-label="Loading">
@@ -114,6 +126,7 @@ function App() {
   if (error) {
     return (
       <div className="app">
+        <div className="app-bg" aria-hidden />
         <Header />
         <main className="main"><p className="empty">Failed to load: {error}. Run <code>node scripts/build-data.cjs</code> to generate data files.</p></main>
       </div>
@@ -122,6 +135,7 @@ function App() {
 
   return (
     <div className="app">
+      <div className="app-bg" aria-hidden />
       <Header />
       <main className="main">
         <nav className="tabs">
@@ -158,7 +172,7 @@ function App() {
                     <span className="filter-hint">(Airline filter unavailable without carriers.json)</span>
                   )}
                 </label>
-                <label className="filter-group">
+                <FilterWithBorderBeam>
                   <span className="filter-label">Origin</span>
                   <select value={filterFrom} onChange={e => setFilterFrom(e.target.value)}>
                     <option value="">All</option>
@@ -166,8 +180,8 @@ function App() {
                       <option key={a.code} value={a.code}>{a.code} {a.name.replace(/\s*\([A-Z]{3}\)\s*$/, '')}</option>
                     ))}
                   </select>
-                </label>
-                <label className="filter-group">
+                </FilterWithBorderBeam>
+                <FilterWithBorderBeam>
                   <span className="filter-label">Destination</span>
                   <select value={filterTo} onChange={e => setFilterTo(e.target.value)}>
                     <option value="">All</option>
@@ -175,7 +189,7 @@ function App() {
                       <option key={a.code} value={a.code}>{a.code} {a.name.replace(/\s*\([A-Z]{3}\)\s*$/, '')}</option>
                     ))}
                   </select>
-                </label>
+                </FilterWithBorderBeam>
               </div>
               {periodOptions.length > 1 && (
                 <p className="controls-note">
@@ -197,19 +211,55 @@ function App() {
             </section>
             <div className="content">
               <div className="route-list">
-                {filteredAndSorted.map(route => (
+                {displayedRoutes.map((route, i) => (
                   <RouteCard
                     key={route.id}
                     route={route}
                     isSelected={selectedId === route.id}
                     onClick={() => setSelectedId(route.id)}
+                    index={i}
                   />
                 ))}
-                {filteredAndSorted.length === 0 && (
+                {filteredAndSorted.length === 0 ? (
                   <div className="empty-state-route">
                     <p className="empty-title">No routes match</p>
                     <p className="empty-desc">Try changing Time, Airline, Origin, or Destination to see more results.</p>
                   </div>
+                ) : totalPages > 1 && (
+                  <nav className="pagination" aria-label="Page navigation">
+                    <button
+                      type="button"
+                      className="pagination-btn"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      ← Prev
+                    </button>
+                    <label className="pagination-page-select">
+                      <span className="pagination-label">Page</span>
+                      <select
+                        value={currentPage}
+                        onChange={e => setCurrentPage(Number(e.target.value))}
+                        className="pagination-select"
+                      >
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                      <span className="pagination-of">/ {totalPages}</span>
+                    </label>
+                    <span className="pagination-range">
+                      {startIndex + 1}–{Math.min(startIndex + PAGE_SIZE, filteredAndSorted.length)} of {filteredAndSorted.length}
+                    </span>
+                    <button
+                      type="button"
+                      className="pagination-btn"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next →
+                    </button>
+                  </nav>
                 )}
               </div>
               {selected && (
