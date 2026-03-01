@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local
+
+# 本地数据（若不想上传可保留）
+# public/data/
+# public/L_AIRPORT_ID.csv

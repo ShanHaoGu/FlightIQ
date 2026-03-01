@@ -1,0 +1,182 @@
+[
+  {
+    "rank": 1,
+    "name": "Salt Lake City, UT (SLC)",
+    "code": "SLC",
+    "onTimePct": 83.96
+  },
+  {
+    "rank": 2,
+    "name": "Washington, DC (IAD)",
+    "code": "IAD",
+    "onTimePct": 82.99
+  },
+  {
+    "rank": 3,
+    "name": "Atlanta, GA (ATL)",
+    "code": "ATL",
+    "onTimePct": 81.62
+  },
+  {
+    "rank": 4,
+    "name": "Minneapolis/St. Paul, MN (MSP)",
+    "code": "MSP",
+    "onTimePct": 81.12
+  },
+  {
+    "rank": 5,
+    "name": "Detroit, MI (DTW)",
+    "code": "DTW",
+    "onTimePct": 80.99
+  },
+  {
+    "rank": 6,
+    "name": "Phoenix, AZ (PHX)",
+    "code": "PHX",
+    "onTimePct": 80.46
+  },
+  {
+    "rank": 7,
+    "name": "Denver, CO (DEN)",
+    "code": "DEN",
+    "onTimePct": 80.1
+  },
+  {
+    "rank": 8,
+    "name": "Los Angeles, CA (LAX)",
+    "code": "LAX",
+    "onTimePct": 79.93
+  },
+  {
+    "rank": 9,
+    "name": "Chicago, IL (MDW)",
+    "code": "MDW",
+    "onTimePct": 79.89
+  },
+  {
+    "rank": 10,
+    "name": "Seattle, WA (SEA)",
+    "code": "SEA",
+    "onTimePct": 79.69
+  },
+  {
+    "rank": 11,
+    "name": "Nashville, TN (BNA)",
+    "code": "BNA",
+    "onTimePct": 79.5
+  },
+  {
+    "rank": 12,
+    "name": "Baltimore, MD (BWI)",
+    "code": "BWI",
+    "onTimePct": 79.25
+  },
+  {
+    "rank": 13,
+    "name": "Houston, TX (IAH)",
+    "code": "IAH",
+    "onTimePct": 78.37
+  },
+  {
+    "rank": 14,
+    "name": "New York, NY (LGA)",
+    "code": "LGA",
+    "onTimePct": 78.36
+  },
+  {
+    "rank": 15,
+    "name": "Chicago, IL (ORD)",
+    "code": "ORD",
+    "onTimePct": 77.86
+  },
+  {
+    "rank": 16,
+    "name": "Washington, DC (DCA)",
+    "code": "DCA",
+    "onTimePct": 77.74
+  },
+  {
+    "rank": 17,
+    "name": "Charlotte, NC (CLT)",
+    "code": "CLT",
+    "onTimePct": 77.21
+  },
+  {
+    "rank": 18,
+    "name": "New York, NY (JFK)",
+    "code": "JFK",
+    "onTimePct": 77.03
+  },
+  {
+    "rank": 19,
+    "name": "Las Vegas, NV (LAS)",
+    "code": "LAS",
+    "onTimePct": 76.89
+  },
+  {
+    "rank": 20,
+    "name": "Philadelphia, PA (PHL)",
+    "code": "PHL",
+    "onTimePct": 76.66
+  },
+  {
+    "rank": 21,
+    "name": "Newark, NJ (EWR)",
+    "code": "EWR",
+    "onTimePct": 76.2
+  },
+  {
+    "rank": 22,
+    "name": "Boston, MA (BOS)",
+    "code": "BOS",
+    "onTimePct": 76.06
+  },
+  {
+    "rank": 23,
+    "name": "Austin, TX (AUS)",
+    "code": "AUS",
+    "onTimePct": 76.02
+  },
+  {
+    "rank": 24,
+    "name": "Miami, FL (MIA)",
+    "code": "MIA",
+    "onTimePct": 75.02
+  },
+  {
+    "rank": 25,
+    "name": "San Diego, CA (SAN)",
+    "code": "SAN",
+    "onTimePct": 74.56
+  },
+  {
+    "rank": 26,
+    "name": "Orlando, FL (MCO)",
+    "code": "MCO",
+    "onTimePct": 74.56
+  },
+  {
+    "rank": 27,
+    "name": "Dallas/Fort Worth, TX (DFW)",
+    "code": "DFW",
+    "onTimePct": 74
+  },
+  {
+    "rank": 28,
+    "name": "Tampa, FL (TPA)",
+    "code": "TPA",
+    "onTimePct": 73.94
+  },
+  {
+    "rank": 29,
+    "name": "Fort Lauderdale, FL (FLL)",
+    "code": "FLL",
+    "onTimePct": 73.86
+  },
+  {
+    "rank": 30,
+    "name": "San Francisco, CA (SFO)",
+    "code": "SFO",
+    "onTimePct": 68.89
+  }
+]
