@@ -1,7 +1,7 @@
 /**
- * 从 T_F41SCHEDULE_B43（BTS Form 41 机队） + AIRLINE_ID 映射 生成航司平均机龄
- * 输入: T_F41SCHEDULE_B43.csv（Desktop）, scripts/airline_id_to_carrier.json
- * 输出: public/data/carrierFleetAge.json（按航司两字码的平均机龄，机龄越低评分可越高）
+ * Build carrier average fleet age from T_F41SCHEDULE_B43 (BTS Form 41 fleet) + AIRLINE_ID mapping.
+ * Input: T_F41SCHEDULE_B43.csv (Desktop), scripts/airline_id_to_carrier.json
+ * Output: public/data/carrierFleetAge.json (average age by carrier code; lower age can yield higher score)
  */
 
 const fs = require('fs')

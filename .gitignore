@@ -6,6 +6,6 @@ dist/
 .env.local
 .env.*.local
 
-# 本地数据（若不想上传可保留）
+# Local data (keep commented if you don't want to commit)
 # public/data/
 # public/L_AIRPORT_ID.csv

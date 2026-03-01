@@ -1,8 +1,8 @@
 /**
- * 从新 12 个月 CSV 生成航线评分数据（新数据模型）
- * 输入: 未命名文件夹 2/1.csv..12.csv（含 OP_UNIQUE_CARRIER, ORIGIN, DEST, 延误/取消）
- *       Annual Airline / Table 4 Airport xlsx（保留航司、机场排名）
- * 输出: public/data/airlines.json, airports.json, routes.json, carriers.json, periodOptions.json
+ * Build route score data from 12 monthly CSVs (new data model).
+ * Input: Unnamed folder 2/1.csv..12.csv (OP_UNIQUE_CARRIER, ORIGIN, DEST, delay/cancel)
+ *        Annual Airline / Table 4 Airport xlsx (airline and airport rankings).
+ * Output: public/data/airlines.json, airports.json, routes.json, carriers.json, periodOptions.json
  */
 
 const fs = require('fs')
@@ -14,8 +14,8 @@ const { parse } = require('csv-parse/sync')
 const DEFAULT_YEAR = 2024
 const OUT_DIR = path.join(__dirname, '../public/data')
 
-// 新 12 个月数据：1.csv=1月, 2.csv=2月, ..., 12.csv=12月
-const ROUTES_CSV_DIR = process.env.ROUTES_CSV_DIR || path.join(os.homedir(), 'Desktop', '未命名文件夹 2')
+// 12 monthly files: 1.csv=Jan, 2.csv=Feb, ..., 12.csv=Dec
+const ROUTES_CSV_DIR = process.env.ROUTES_CSV_DIR || path.join(os.homedir(), 'Desktop', 'Unnamed Folder 2')
 function getMonthCsvPath(month) {
   return path.join(ROUTES_CSV_DIR, `${month}.csv`)
 }
@@ -23,7 +23,7 @@ function getMonthCsvPath(month) {
 const AIRLINE_XLSX = process.env.AIRLINE_XLSX || path.join(os.homedir(), 'Downloads', 'Annual Airline On-Time Rankings 2003-2024.xlsx')
 const AIRPORT_XLSX = process.env.AIRPORT_XLSX || path.join(os.homedir(), 'Downloads', 'Table 4 Ranking of Major Airport On-Time Arrival Performance Year-to-date through December 2003-Dec 2024.xlsx')
 
-// BTS 承运人代码 -> 显示名称（常见）
+// BTS carrier code -> display name (common carriers)
 const CARRIER_NAMES = {
   '9E': 'Endeavor Air',
   'AA': 'American Airlines',
@@ -81,7 +81,7 @@ function parseAirportRanking() {
   return result
 }
 
-/** 解析单月 CSV：表头需含 OP_UNIQUE_CARRIER, ORIGIN, DEST, ARR_DEL15, CANCELLED */
+/** Parse single-month CSV: header must include OP_UNIQUE_CARRIER, ORIGIN, DEST, ARR_DEL15, CANCELLED */
 function aggregateOneMonthCsv(filePath, month, year) {
   const text = fs.readFileSync(filePath, 'utf8')
   let rows
@@ -113,7 +113,7 @@ function aggregateOneMonthCsv(filePath, month, year) {
   return { count, cityNames, month, year }
 }
 
-/** 从 12 个新 CSV 构建航线（含航司） */
+/** Build routes from 12 monthly CSVs (with carrier) */
 function buildRoutesFromNewTwelveFiles() {
   const routeMap = {}
   const allCityNames = {}
@@ -202,7 +202,8 @@ function main() {
 
   const periodOptions = []
   for (let m = 1; m <= 12; m++) {
-    periodOptions.push({ year: DEFAULT_YEAR, month: m, label: DEFAULT_YEAR + '年' + m + '月' })
+    const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    periodOptions.push({ year: DEFAULT_YEAR, month: m, label: monthNames[m] + ' ' + DEFAULT_YEAR })
   }
 
   fs.mkdirSync(OUT_DIR, { recursive: true })
