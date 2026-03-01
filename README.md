@@ -14,6 +14,25 @@ A web app that generates **airline on-time rankings**, **airport on-time ranking
 
 ---
 
+## Division of Responsibilities
+
+**FlightIQ Core** (shared):
+- Algorithm design
+- Prompt writing
+- Debugging
+- Testing
+
+| Role | Responsibilities |
+|------|------------------|
+| **Shanhao Gu** | Idea & concept, web development, video creation |
+| **Sean Fan** | Idea & concept, web development |
+| **Sophia Lyu** | Data collection, data cleaning, PPT creation |
+| **Elya Fan** | Output presentation, UI/UX enhancement, PPT creation & summary |
+
+*Model selection and integration, review & planning, and project team plans* are coordinated across the team.
+
+---
+
 ## Data Sources
 
 | Source | Purpose |
