@@ -10,7 +10,10 @@ const DATA_BASE = '/data'
 function App() {
   const [airlines, setAirlines] = useState([])
   const [airports, setAirports] = useState([])
+  const [carriers, setCarriers] = useState([])
   const [rawRoutes, setRawRoutes] = useState([])
+  const [carrierBaggageRates, setCarrierBaggageRates] = useState(null)
+  const [carrierFleetAge, setCarrierFleetAge] = useState(null)
   const [periodOptions, setPeriodOptions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -27,14 +30,20 @@ function App() {
     Promise.all([
       fetch(`${DATA_BASE}/airlines.json`).then(r => r.ok ? r.json() : []),
       fetch(`${DATA_BASE}/airports.json`).then(r => r.ok ? r.json() : []),
+      fetch(`${DATA_BASE}/carriers.json`).then(r => r.ok ? r.json() : []),
       fetch(`${DATA_BASE}/routes.json`).then(r => r.ok ? r.json() : []),
-      fetch(`${DATA_BASE}/periodOptions.json`).then(r => r.ok ? r.json() : [])
+      fetch(`${DATA_BASE}/periodOptions.json`).then(r => r.ok ? r.json() : []),
+      fetch(`${DATA_BASE}/carrierBaggageRates.json`).then(r => r.ok ? r.json() : null),
+      fetch(`${DATA_BASE}/carrierFleetAge.json`).then(r => r.ok ? r.json() : null)
     ])
-      .then(([a, b, c, p]) => {
+      .then(([a, b, carr, c, p, baggage, fleetAge]) => {
         setAirlines(Array.isArray(a) ? a : [])
         setAirports(Array.isArray(b) ? b : [])
+        setCarriers(Array.isArray(carr) ? carr : [])
         setRawRoutes(Array.isArray(c) ? c : [])
         setPeriodOptions(Array.isArray(p) ? p : [])
+        setCarrierBaggageRates(baggage && baggage.rates ? baggage : null)
+        setCarrierFleetAge(fleetAge && fleetAge.averageAgeByCarrier ? fleetAge : null)
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -50,19 +59,22 @@ function App() {
   }, [filterPeriod, periodOptions])
 
   const filteredRaw = useMemo(() => {
-    let list = rawRoutes
+    const withBaggage = rawRoutes.map(r => ({
+      ...r,
+      baggageMishandledPer100: carrierBaggageRates?.rates?.[r.carrier] ?? null,
+      fleetAgeYears: carrierFleetAge?.averageAgeByCarrier?.[r.carrier] ?? null
+    }))
+    let list = withBaggage
     if (filterFrom) list = list.filter(r => r.fromCode === filterFrom)
     if (filterTo) list = list.filter(r => r.toCode === filterTo)
-    if (filterAirline && list.length > 0 && list[0].carrier != null) {
-      list = list.filter(r => r.carrier === filterAirline)
-    }
+    if (filterAirline) list = list.filter(r => r.carrier === filterAirline)
     if (period && period.year && period.month) {
       list = list.filter(r =>
         r.periods && r.periods.some(p => p.year === period.year && p.month === period.month)
       )
     }
     return list
-  }, [rawRoutes, filterFrom, filterTo, filterAirline, period])
+  }, [rawRoutes, carrierBaggageRates, carrierFleetAge, filterFrom, filterTo, filterAirline, period])
 
   const routes = useMemo(
     () => processRoutes(filteredRaw, period),
@@ -90,7 +102,12 @@ function App() {
     return (
       <div className="app">
         <Header />
-        <main className="main"><p className="empty">加载数据中…</p></main>
+        <main className="main">
+          <div className="loading-wrap" role="status" aria-label="Loading">
+            <div className="loading-spinner" />
+            <p className="loading-text">Loading data…</p>
+          </div>
+        </main>
       </div>
     )
   }
@@ -98,7 +115,7 @@ function App() {
     return (
       <div className="app">
         <Header />
-        <main className="main"><p className="empty">加载失败：{error}。请先运行 <code>node scripts/build-data.cjs</code> 生成 data 文件。</p></main>
+        <main className="main"><p className="empty">Failed to load: {error}. Run <code>node scripts/build-data.cjs</code> to generate data files.</p></main>
       </div>
     )
   }
@@ -108,9 +125,9 @@ function App() {
       <Header />
       <main className="main">
         <nav className="tabs">
-          <button type="button" className={tab === 'routes' ? 'active' : ''} onClick={() => setTab('routes')}>航线准点评分</button>
-          <button type="button" className={tab === 'airlines' ? 'active' : ''} onClick={() => setTab('airlines')}>航司准点排名</button>
-          <button type="button" className={tab === 'airports' ? 'active' : ''} onClick={() => setTab('airports')}>机场准点排名</button>
+          <button type="button" className={tab === 'routes' ? 'active' : ''} onClick={() => setTab('routes')}>Route on-time score</button>
+          <button type="button" className={tab === 'airlines' ? 'active' : ''} onClick={() => setTab('airlines')}>Airline on-time rank</button>
+          <button type="button" className={tab === 'airports' ? 'active' : ''} onClick={() => setTab('airports')}>Airport on-time rank</button>
         </nav>
 
         {tab === 'routes' && (
@@ -118,42 +135,42 @@ function App() {
             <section className="controls">
               <div className="filters">
                 <label className="filter-group">
-                  <span className="filter-label">时间</span>
+                  <span className="filter-label">Time</span>
                   <select value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)}>
-                    <option value="">全部</option>
+                    <option value="">All</option>
                     {periodOptions.map(opt => (
-                      <option key={opt.year + '-' + opt.month} value={opt.year + '-' + opt.month}>{opt.label}</option>
+                      <option key={opt.year + '-' + opt.month} value={opt.year + '-' + opt.month}>{['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][opt.month - 1]}</option>
                     ))}
                   </select>
                   {periodOptions.length <= 1 && (
-                    <span className="filter-hint">选项来自数据中的年-月，当前 CSV 仅含上述月份</span>
+                    <span className="filter-hint">Options from data year-month; current CSV has these months only.</span>
                   )}
                 </label>
                 <label className="filter-group">
-                  <span className="filter-label">航司</span>
+                  <span className="filter-label">Airline</span>
                   <select value={filterAirline} onChange={e => setFilterAirline(e.target.value)}>
-                    <option value="">全部</option>
-                    {airlines.map(a => (
-                      <option key={a.name} value={a.name}>{a.name}</option>
+                    <option value="">All</option>
+                    {carriers.map(c => (
+                      <option key={c.code} value={c.code}>{c.name}</option>
                     ))}
                   </select>
-                  {rawRoutes.length > 0 && rawRoutes[0].carrier == null && (
-                    <span className="filter-hint">（航线数据暂无航司字段，接入后生效）</span>
+                  {carriers.length === 0 && rawRoutes.length > 0 && (
+                    <span className="filter-hint">(Airline filter unavailable without carriers.json)</span>
                   )}
                 </label>
                 <label className="filter-group">
-                  <span className="filter-label">出发机场</span>
+                  <span className="filter-label">Origin</span>
                   <select value={filterFrom} onChange={e => setFilterFrom(e.target.value)}>
-                    <option value="">全部</option>
+                    <option value="">All</option>
                     {airports.map(a => (
                       <option key={a.code} value={a.code}>{a.code} {a.name.replace(/\s*\([A-Z]{3}\)\s*$/, '')}</option>
                     ))}
                   </select>
                 </label>
                 <label className="filter-group">
-                  <span className="filter-label">到达机场</span>
+                  <span className="filter-label">Destination</span>
                   <select value={filterTo} onChange={e => setFilterTo(e.target.value)}>
-                    <option value="">全部</option>
+                    <option value="">All</option>
                     {airports.map(a => (
                       <option key={a.code} value={a.code}>{a.code} {a.name.replace(/\s*\([A-Z]{3}\)\s*$/, '')}</option>
                     ))}
@@ -162,19 +179,19 @@ function App() {
               </div>
               {periodOptions.length > 1 && (
                 <p className="controls-note">
-                  准点率为年度机场数据，不随月份变化；选择具体月份后，航班量显示当月数据，评分按当月航班量重新计算（当月权重更高）。
+                  On-time rate is annual; selecting a month shows that month’s flight count and recalculates score with higher weight for that month.
                 </p>
               )}
               <div className="sort-row">
-                <span className="sort-label">排序：</span>
+                <span className="sort-label">Sort by:</span>
                 <select value={sortBy} onChange={e => setSortBy(e.target.value)}>
-                  <option value="score">综合评分</option>
-                  <option value="onTimePct">准点率</option>
-                  <option value="delayRate">延误率</option>
-                  <option value="flightCount">航班量</option>
+                  <option value="score">Score</option>
+                  <option value="onTimePct">On-time %</option>
+                  <option value="delayRate">Delay rate</option>
+                  <option value="flightCount">Flights</option>
                 </select>
                 <button type="button" className="order-btn" onClick={() => setOrder(o => (o === 'desc' ? 'asc' : 'desc'))}>
-                  {order === 'desc' ? '从高到低' : '从低到高'}
+                  {order === 'desc' ? 'High to low' : 'Low to high'}
                 </button>
               </div>
             </section>
@@ -188,7 +205,12 @@ function App() {
                     onClick={() => setSelectedId(route.id)}
                   />
                 ))}
-                {filteredAndSorted.length === 0 && <p className="empty">当前筛选下没有航线</p>}
+                {filteredAndSorted.length === 0 && (
+                  <div className="empty-state-route">
+                    <p className="empty-title">No routes match</p>
+                    <p className="empty-desc">Try changing Time, Airline, Origin, or Destination to see more results.</p>
+                  </div>
+                )}
               </div>
               {selected && (
                 <RouteDetail route={selected} onClose={() => setSelectedId(null)} />
@@ -201,18 +223,16 @@ function App() {
           <div className="table-wrap">
             <table className="rank-table">
               <thead>
-                <tr><th>排名</th><th>航司</th><th>准点率</th><th>等级</th></tr>
+                <tr><th>Rank</th><th>Airline</th><th>On-time %</th></tr>
               </thead>
               <tbody>
                 {airlines.map(a => {
                   const score = a.onTimePct != null ? Math.round(a.onTimePct) : null
-                  const grade = getGrade(score)
                   return (
                     <tr key={a.rank}>
                       <td>{a.rank}</td>
                       <td>{a.name}</td>
                       <td>{a.onTimePct != null ? `${a.onTimePct}%` : '—'}</td>
-                      <td><span style={{ color: grade.color }}>{grade.label}</span></td>
                     </tr>
                   )
                 })}
@@ -225,19 +245,17 @@ function App() {
           <div className="table-wrap">
             <table className="rank-table">
               <thead>
-                <tr><th>排名</th><th>机场</th><th>代码</th><th>准点率</th><th>等级</th></tr>
+                <tr><th>Rank</th><th>Airport</th><th>Code</th><th>On-time %</th></tr>
               </thead>
               <tbody>
                 {airports.map(a => {
                   const score = a.onTimePct != null ? Math.round(a.onTimePct) : null
-                  const grade = getGrade(score)
                   return (
                     <tr key={a.rank}>
                       <td>{a.rank}</td>
                       <td>{a.name}</td>
                       <td><code>{a.code}</code></td>
                       <td>{a.onTimePct != null ? `${a.onTimePct}%` : '—'}</td>
-                      <td><span style={{ color: grade.color }}>{grade.label}</span></td>
                     </tr>
                   )
                 })}

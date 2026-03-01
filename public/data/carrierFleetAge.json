@@ -1,0 +1,28 @@
+{
+  "source": "BTS Form 41 Schedule B-43 (Inventory of Airframes), MANUFACTURE_YEAR",
+  "unit": "years",
+  "referenceYear": 2025,
+  "averageAgeByCarrier": {
+    "UA": 16.4,
+    "AA": 26.7,
+    "DL": 17.3,
+    "NK": 12.3,
+    "B6": 15.3,
+    "G4": 22.6,
+    "F9": 14.4,
+    "HA": 11.4,
+    "G7": 21.3,
+    "AS": 14.4,
+    "WN": 16.5,
+    "QX": 15.9,
+    "OH": 13.7,
+    "ZW": 23.3,
+    "PT": 17.1,
+    "MQ": 9.6,
+    "YV": 13.4,
+    "C5": 21.3,
+    "OO": 14.9,
+    "YX": 9.3,
+    "9E": 5.2
+  }
+}

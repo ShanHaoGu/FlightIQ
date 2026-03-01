@@ -1,56 +1,51 @@
 /**
- * 从用户提供的三个数据源生成航线评分数据
- * 输入: T_ONTIME_MARKETING.csv, Annual Airline On-Time Rankings xlsx, Table 4 Airport xlsx, L_AIRPORT_ID.csv
- * 输出: public/data/airlines.json, airports.json, routes.json
+ * 从新 12 个月 CSV 生成航线评分数据（新数据模型）
+ * 输入: 未命名文件夹 2/1.csv..12.csv（含 OP_UNIQUE_CARRIER, ORIGIN, DEST, 延误/取消）
+ *       Annual Airline / Table 4 Airport xlsx（保留航司、机场排名）
+ * 输出: public/data/airlines.json, airports.json, routes.json, carriers.json, periodOptions.json
  */
 
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
 const XLSX = require('xlsx')
+const { parse } = require('csv-parse/sync')
 
-const DOWNLOADS = process.env.DOWNLOADS || path.join(os.homedir(), 'Downloads')
-const AIRLINE_XLSX = path.join(DOWNLOADS, 'Annual Airline On-Time Rankings 2003-2024.xlsx')
-const AIRPORT_XLSX = path.join(DOWNLOADS, 'Table 4 Ranking of Major Airport On-Time Arrival Performance Year-to-date through December 2003-Dec 2024.xlsx')
-const ROUTES_CSV = path.join(DOWNLOADS, 'T_ONTIME_MARKETING.csv')
-// 1月=尾缀2, 2月=尾缀3, ..., 12月=尾缀13
-const ROUTES_CSV_BY_MONTH = []
-for (let month = 1; month <= 12; month++) {
-  ROUTES_CSV_BY_MONTH.push(path.join(DOWNLOADS, `T_ONTIME_MARKETING ${month + 1}.csv`))
-}
 const DEFAULT_YEAR = 2024
-const AIRPORT_ID_CSV = path.join(__dirname, '../public/L_AIRPORT_ID.csv')
 const OUT_DIR = path.join(__dirname, '../public/data')
 
-// Table 4 中同一城市多机场时，代码 -> 机场名称关键词，用于匹配 L_AIRPORT Description
-const CODE_TO_NAME_HINT = {
-  DCA: 'Reagan',
-  IAD: 'Dulles',
-  LGA: 'LaGuardia',
-  JFK: 'Kennedy',
-  EWR: 'Newark',
-  ORD: "O'Hare",
-  MDW: 'Midway',
-  BOS: 'Logan',
-  MIA: 'International',
-  FLL: 'Fort Lauderdale',
-  SFO: 'International',
-  LAX: 'International',
-  SEA: 'Seattle/Tacoma',
-  DEN: 'International',
-  PHX: 'Sky Harbor',
-  DFW: 'Dallas/Fort Worth',
-  IAH: 'Houston',
-  ATL: 'Hartsfield',
-  MSP: 'Minneapolis-St Paul',
-  DTW: 'Detroit Metro',
-  CLT: 'Charlotte',
-  BWI: 'Baltimore',
-  DCA: 'Reagan',
-  IAD: 'Dulles'
+// 新 12 个月数据：1.csv=1月, 2.csv=2月, ..., 12.csv=12月
+const ROUTES_CSV_DIR = process.env.ROUTES_CSV_DIR || path.join(os.homedir(), 'Desktop', '未命名文件夹 2')
+function getMonthCsvPath(month) {
+  return path.join(ROUTES_CSV_DIR, `${month}.csv`)
+}
+
+const AIRLINE_XLSX = process.env.AIRLINE_XLSX || path.join(os.homedir(), 'Downloads', 'Annual Airline On-Time Rankings 2003-2024.xlsx')
+const AIRPORT_XLSX = process.env.AIRPORT_XLSX || path.join(os.homedir(), 'Downloads', 'Table 4 Ranking of Major Airport On-Time Arrival Performance Year-to-date through December 2003-Dec 2024.xlsx')
+
+// BTS 承运人代码 -> 显示名称（常见）
+const CARRIER_NAMES = {
+  '9E': 'Endeavor Air',
+  'AA': 'American Airlines',
+  'AS': 'Alaska Airlines',
+  'B6': 'JetBlue Airways',
+  'DL': 'Delta Air Lines',
+  'F9': 'Frontier Airlines',
+  'G4': 'Allegiant Air',
+  'HA': 'Hawaiian Airlines',
+  'NK': 'Spirit Airlines',
+  'OO': 'SkyWest Airlines',
+  'UA': 'United Airlines',
+  'WN': 'Southwest Airlines',
+  'YX': 'Republic Airways',
+  'MQ': 'Envoy Air',
+  'OH': 'PSA Airlines',
+  'QX': 'Horizon Air',
+  'YV': 'Mesa Airlines'
 }
 
 function parseAirlineRanking() {
+  if (!fs.existsSync(AIRLINE_XLSX)) return []
   const wb = XLSX.readFile(AIRLINE_XLSX)
   const sheetName = wb.SheetNames.find(n => n.includes('Marketing') && n.includes('2024')) || 'Marketing 2024'
   const ws = wb.Sheets[sheetName]
@@ -67,6 +62,7 @@ function parseAirlineRanking() {
 }
 
 function parseAirportRanking() {
+  if (!fs.existsSync(AIRPORT_XLSX)) return []
   const wb = XLSX.readFile(AIRPORT_XLSX)
   const ws = wb.Sheets['2024']
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1 })
@@ -85,290 +81,141 @@ function parseAirportRanking() {
   return result
 }
 
-function loadAirportIdToDescription() {
-  const text = fs.readFileSync(AIRPORT_ID_CSV, 'utf8')
-  const lines = text.split(/\r?\n/).filter(Boolean)
-  const map = {}
-  for (let i = 1; i < lines.length; i++) {
-    const m = lines[i].match(/"(\d+)","(.+)"/)
-    if (m) map[m[1]] = m[2]
-  }
-  return map
-}
-
-function buildCodeToId(airportRows, idToDesc) {
-  const codeToId = {}
-  const cityToCodes = {}
-  for (const a of airportRows) {
-    const citySt = a.name.replace(/\s*\([A-Z]{3}\)\s*$/, '').trim()
-    if (!cityToCodes[citySt]) cityToCodes[citySt] = []
-    cityToCodes[citySt].push({ code: a.code, onTimePct: a.onTimePct })
-  }
-  for (const [id, desc] of Object.entries(idToDesc)) {
-    const idx = desc.indexOf(':')
-    const citySt = idx >= 0 ? desc.slice(0, idx).trim() : desc
-    const namePart = idx >= 0 ? desc.slice(idx + 1).trim() : ''
-    const codes = cityToCodes[citySt]
-    if (!codes) continue
-    if (codes.length === 1) {
-      codeToId[codes[0].code] = { id, onTimePct: codes[0].onTimePct }
-    } else {
-      const hint = CODE_TO_NAME_HINT
-      for (const c of codes) {
-        const key = c.code
-        const hintStr = hint[key]
-        if (hintStr && namePart.includes(hintStr)) {
-          codeToId[key] = { id, onTimePct: c.onTimePct }
-          break
-        }
-      }
-      if (!codeToId[codes[0].code]) codeToId[codes[0].code] = { id, onTimePct: codes[0].onTimePct }
-    }
-  }
-  return codeToId
-}
-
-/** 从单个 CSV 按 (origin, dest) 聚合航班量 */
-function aggregateOneCsv(filePath, month, year) {
+/** 解析单月 CSV：表头需含 OP_UNIQUE_CARRIER, ORIGIN, DEST, ARR_DEL15, CANCELLED */
+function aggregateOneMonthCsv(filePath, month, year) {
   const text = fs.readFileSync(filePath, 'utf8')
-  const lines = text.split(/\r?\n/).filter(Boolean)
-  const header = lines[0].split(',')
-  const originIdx = header.indexOf('ORIGIN_AIRPORT_ID')
-  const destIdx = header.indexOf('DEST_AIRPORT_ID')
-  if (originIdx < 0 || destIdx < 0) return null
-  const count = {}
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',')
-    const o = cols[originIdx].trim()
-    const d = cols[destIdx].trim()
-    if (!o || !d) continue
-    const key = o + '|' + d
-    count[key] = (count[key] || 0) + 1
+  let rows
+  try {
+    rows = parse(text, { columns: true, skip_empty_lines: true, relax_column_count: true })
+  } catch (e) {
+    console.error('Parse error', filePath, e.message)
+    return null
   }
-  return { count, month, year }
+  const count = {}
+  const cityNames = {}
+  for (const r of rows) {
+    const carrier = (r.OP_UNIQUE_CARRIER || '').trim()
+    const origin = (r.ORIGIN || '').trim().toUpperCase()
+    const dest = (r.DEST || '').trim().toUpperCase()
+    if (!carrier || !origin || !dest || origin.length !== 3 || dest.length !== 3) continue
+    const key = `${origin}|${dest}|${carrier}`
+    if (!count[key]) {
+      count[key] = { flights: 0, arrDel15: 0, cancelled: 0 }
+      cityNames[origin] = (r.ORIGIN_CITY_NAME || '').trim().replace(/^"|"$/g, '')
+      cityNames[dest] = (r.DEST_CITY_NAME || '').trim().replace(/^"|"$/g, '')
+    }
+    count[key].flights += 1
+    const d15 = parseFloat(r.ARR_DEL15)
+    const canc = parseFloat(r.CANCELLED)
+    if (!isNaN(d15)) count[key].arrDel15 += d15
+    if (!isNaN(canc)) count[key].cancelled += canc
+  }
+  return { count, cityNames, month, year }
 }
 
-/** 从 12 个月份 CSV 合并（尾缀 2=1月, 3=2月, ..., 13=12月） */
-function aggregateRoutesFromTwelveFiles() {
-  const totalCount = {}
-  const periodMap = {}
-  const year = DEFAULT_YEAR
+/** 从 12 个新 CSV 构建航线（含航司） */
+function buildRoutesFromNewTwelveFiles() {
+  const routeMap = {}
+  const allCityNames = {}
   for (let month = 1; month <= 12; month++) {
-    const filePath = ROUTES_CSV_BY_MONTH[month - 1]
+    const filePath = getMonthCsvPath(month)
     if (!fs.existsSync(filePath)) continue
-    const result = aggregateOneCsv(filePath, month, year)
+    const result = aggregateOneMonthCsv(filePath, month, DEFAULT_YEAR)
     if (!result) continue
-    for (const [routeKey, n] of Object.entries(result.count)) {
-      totalCount[routeKey] = (totalCount[routeKey] || 0) + n
-      if (!periodMap[routeKey]) periodMap[routeKey] = []
-      periodMap[routeKey].push({
+    for (const [key, v] of Object.entries(result.count)) {
+      if (!routeMap[key]) {
+        routeMap[key] = { periods: [], totalFlights: 0, totalDel15: 0, totalCanc: 0 }
+      }
+      const r = routeMap[key]
+      r.totalFlights += v.flights
+      r.totalDel15 += v.arrDel15
+      r.totalCanc += v.cancelled
+      r.periods.push({
         year: result.year,
         month: result.month,
         quarter: Math.ceil(result.month / 3),
-        flightCount: n
+        flightCount: v.flights,
+        delayed15: v.arrDel15,
+        cancelled: v.cancelled,
+        onTimePct: v.flights > 0 ? Math.round((1 - (v.arrDel15 + v.cancelled) / v.flights) * 10000) / 100 : null
       })
+      Object.assign(allCityNames, result.cityNames)
     }
   }
-  for (const k of Object.keys(periodMap)) {
-    periodMap[k].sort((a, b) => a.month - b.month)
+  for (const r of Object.values(routeMap)) {
+    r.periods.sort((a, b) => a.month - b.month)
   }
-  return Object.entries(totalCount)
-    .map(([k, n]) => {
-      const [originId, destId] = k.split('|')
-      return {
-        originId,
-        destId,
-        flightCount: n,
-        periods: periodMap[k] || []
-      }
-    })
-    .sort((a, b) => b.flightCount - a.flightCount)
-}
-
-function aggregateRoutes() {
-  const useTwelve = ROUTES_CSV_BY_MONTH.every(p => fs.existsSync(p))
-  if (useTwelve) {
-    return aggregateRoutesFromTwelveFiles()
-  }
-  if (!fs.existsSync(ROUTES_CSV)) throw new Error('No route CSV found (need either 12 files T_ONTIME_MARKETING 2..13.csv or T_ONTIME_MARKETING.csv)')
-  const text = fs.readFileSync(ROUTES_CSV, 'utf8')
-  const lines = text.split(/\r?\n/).filter(Boolean)
-  const header = lines[0].split(',')
-  const originIdx = header.indexOf('ORIGIN_AIRPORT_ID')
-  const destIdx = header.indexOf('DEST_AIRPORT_ID')
-  const yearIdx = header.indexOf('YEAR')
-  const monthIdx = header.indexOf('MONTH')
-  const quarterIdx = header.indexOf('QUARTER')
-  if (originIdx < 0 || destIdx < 0) throw new Error('CSV missing ORIGIN_AIRPORT_ID or DEST_AIRPORT_ID')
-  const totalCount = {}
-  const periodCount = {}
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',')
-    const o = cols[originIdx].trim()
-    const d = cols[destIdx].trim()
-    if (!o || !d) continue
-    const routeKey = o + '|' + d
-    totalCount[routeKey] = (totalCount[routeKey] || 0) + 1
-    const year = yearIdx >= 0 ? cols[yearIdx].trim() : ''
-    const month = monthIdx >= 0 ? cols[monthIdx].trim() : ''
-    const quarter = quarterIdx >= 0 ? cols[quarterIdx].trim() : ''
-    if (year && month) {
-      const periodKey = routeKey + '|' + year + '|' + month + '|' + quarter
-      periodCount[periodKey] = (periodCount[periodKey] || 0) + 1
-    }
-  }
-  const periodMap = {}
-  for (const [periodKey, n] of Object.entries(periodCount)) {
-    const parts = periodKey.split('|')
-    if (parts.length < 5) continue
-    const routeKey = parts[0] + '|' + parts[1]
-    const y = parseInt(parts[2], 10)
-    const m = parseInt(parts[3], 10)
-    if (!y || !m) continue
-    if (!periodMap[routeKey]) periodMap[routeKey] = []
-    periodMap[routeKey].push({
-      year: y,
-      month: m,
-      quarter: parseInt(parts[4], 10) || null,
-      flightCount: n
-    })
-  }
-  return Object.entries(totalCount)
-    .map(([k, n]) => {
-      const [originId, destId] = k.split('|')
-      const periods = (periodMap[k] || []).sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month)
-      return { originId, destId, flightCount: n, periods }
-    })
-    .sort((a, b) => b.flightCount - a.flightCount)
-}
-
-function buildIdToCodeAndPct(airportRows, idToDesc) {
-  const codeToInfo = {}
-  for (const a of airportRows) codeToInfo[a.code] = a.onTimePct
-  const cityStToCodes = {}
-  const normalizeCity = (s) => s.replace(/\s*\/\s*St\.?\s*Paul\s*,/, ',').trim()
-  for (const a of airportRows) {
-    const citySt2 = a.name.replace(/\s*\([A-Z]{3}\)\s*$/, '').trim()
-    if (!citySt2) continue
-    const entry = { code: a.code, onTimePct: a.onTimePct }
-    for (const key of [citySt2, normalizeCity(citySt2)]) {
-      if (!key) continue
-      if (!cityStToCodes[key]) cityStToCodes[key] = []
-      if (!cityStToCodes[key].some(x => x.code === a.code)) cityStToCodes[key].push(entry)
-    }
-  }
-  const idToCode = {}
-  const idToPct = {}
-  for (const [id, desc] of Object.entries(idToDesc)) {
-    const idx = desc.indexOf(':')
-    let citySt = idx >= 0 ? desc.slice(0, idx).trim() : desc
-    if (!cityStToCodes[citySt]) citySt = normalizeCity(citySt)
-    const namePart = idx >= 0 ? desc.slice(idx + 1).trim() : ''
-    const codes = cityStToCodes[citySt]
-    if (!codes) continue
-    let code = codes.length === 1 ? codes[0].code : null
-    let pct = codes.length === 1 ? codes[0].onTimePct : null
-    if (codes.length > 1) {
-      for (const c of codes) {
-        const hintStr = CODE_TO_NAME_HINT[c.code]
-        if (hintStr && namePart.includes(hintStr)) {
-          code = c.code
-          pct = c.onTimePct
-          break
+  const routes = []
+  const carrierSet = new Set()
+  for (const [key, r] of Object.entries(routeMap)) {
+    const [fromCode, toCode, carrier] = key.split('|')
+    carrierSet.add(carrier)
+    const total = r.totalFlights
+    const onTimePct = total > 0 ? Math.round((1 - (r.totalDel15 + r.totalCanc) / total) * 10000) / 100 : null
+    const delayRate = total > 0 ? Math.round((r.totalDel15 / total) * 10000) / 100 : null
+    const cancelRate = total > 0 ? Math.round((r.totalCanc / total) * 10000) / 100 : null
+    routes.push({
+      fromCode,
+      toCode,
+      from: allCityNames[fromCode] || fromCode,
+      to: allCityNames[toCode] || toCode,
+      carrier,
+      carrierName: CARRIER_NAMES[carrier] || carrier,
+      totalFlightCount: total,
+      periods: r.periods.map(p => {
+        const fc = p.flightCount
+        const delayRate = fc > 0 ? Math.round((p.delayed15 / fc) * 10000) / 100 : null
+        const cancelRate = fc > 0 ? Math.round((p.cancelled / fc) * 10000) / 100 : null
+        return {
+          year: p.year,
+          month: p.month,
+          quarter: p.quarter,
+          flightCount: p.flightCount,
+          onTimePct: p.onTimePct,
+          delayRate,
+          cancelRate
         }
-      }
-      if (!code) {
-        code = codes[0].code
-        pct = codes[0].onTimePct
-      }
-    }
-    if (code) {
-      idToCode[id] = code
-      idToPct[id] = pct
-    }
+      }),
+      onTimePct,
+      delayRate,
+      cancelRate
+    })
   }
-  return { idToCode, idToPct }
+  routes.sort((a, b) => b.totalFlightCount - a.totalFlightCount)
+  const carriers = Array.from(carrierSet).sort().map(code => ({
+    code,
+    name: CARRIER_NAMES[code] || code
+  }))
+  return { routes, carriers }
 }
 
 function main() {
-  if (!fs.existsSync(AIRLINE_XLSX)) {
-    console.error('Missing:', AIRLINE_XLSX)
-    process.exit(1)
-  }
-  if (!fs.existsSync(AIRPORT_XLSX)) {
-    console.error('Missing:', AIRPORT_XLSX)
-    process.exit(1)
-  }
-  const hasTwelve = ROUTES_CSV_BY_MONTH.every(p => fs.existsSync(p))
-  if (!hasTwelve && !fs.existsSync(ROUTES_CSV)) {
-    console.error('Missing: need either all 12 files (T_ONTIME_MARKETING 2.csv .. 13.csv) or', ROUTES_CSV)
-    process.exit(1)
-  }
-  if (!fs.existsSync(AIRPORT_ID_CSV)) {
-    console.error('Missing:', AIRPORT_ID_CSV, '(run from project root or ensure public/L_AIRPORT_ID.csv exists)')
+  const useNew = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every(m => fs.existsSync(getMonthCsvPath(m)))
+  if (!useNew) {
+    console.error('Missing: need all 12 files in', ROUTES_CSV_DIR, '(1.csv .. 12.csv). Set ROUTES_CSV_DIR if needed.')
     process.exit(1)
   }
 
   const airlines = parseAirlineRanking()
   const airports = parseAirportRanking()
-  const idToDesc = loadAirportIdToDescription()
-  const { idToCode, idToPct } = buildIdToCodeAndPct(airports, idToDesc)
+  const { routes, carriers } = buildRoutesFromNewTwelveFiles()
 
-  const usedTwelveFiles = ROUTES_CSV_BY_MONTH.every(p => fs.existsSync(p))
-  const routeAgg = aggregateRoutes()
-  const codeToName = {}
-  airports.forEach(a => { codeToName[a.code] = a.name.replace(/\s*\([A-Z]{3}\)\s*$/, '').trim() })
-
-  const routes = []
-  const yearMonthSet = new Set()
-  if (usedTwelveFiles) {
-    for (let m = 1; m <= 12; m++) yearMonthSet.add(DEFAULT_YEAR + '-' + m)
+  const periodOptions = []
+  for (let m = 1; m <= 12; m++) {
+    periodOptions.push({ year: DEFAULT_YEAR, month: m, label: DEFAULT_YEAR + '年' + m + '月' })
   }
-  for (const r of routeAgg.slice(0, 500)) {
-    const fromCode = idToCode[r.originId]
-    const toCode = idToCode[r.destId]
-    const fromPct = idToPct[r.originId]
-    const toPct = idToPct[r.destId]
-    if (!fromCode || !toCode) continue
-    const onTimePct = (fromPct != null && toPct != null)
-      ? (fromPct + toPct) / 2
-      : fromPct ?? toPct ?? null
-    for (const p of r.periods || []) {
-      yearMonthSet.add(p.year + '-' + p.month)
-    }
-    routes.push({
-      from: codeToName[fromCode] || fromCode,
-      to: codeToName[toCode] || toCode,
-      fromCode,
-      toCode,
-      totalFlightCount: r.flightCount,
-      periods: (r.periods || []).map(p => ({ year: p.year, month: p.month, quarter: p.quarter, flightCount: p.flightCount })),
-      onTimePct: onTimePct != null ? Math.round(onTimePct * 100) / 100 : null,
-      delayRate: onTimePct != null ? Math.round((100 - onTimePct) * 100) / 100 : null
-    })
-  }
-
-  const periodOptions = Array.from(yearMonthSet)
-    .sort((a, b) => {
-      const [ya, ma] = a.split('-').map(Number)
-      const [yb, mb] = b.split('-').map(Number)
-      return ya !== yb ? ya - yb : ma - mb
-    })
-    .map(s => {
-      const [y, m] = s.split('-').map(Number)
-      return { year: y, month: m, label: y + '年' + m + '月' }
-    })
-    .filter(p => p.year && p.month)
 
   fs.mkdirSync(OUT_DIR, { recursive: true })
   fs.writeFileSync(path.join(OUT_DIR, 'airlines.json'), JSON.stringify(airlines, null, 2))
   fs.writeFileSync(path.join(OUT_DIR, 'airports.json'), JSON.stringify(airports, null, 2))
-  fs.writeFileSync(path.join(OUT_DIR, 'routes.json'), JSON.stringify(routes, null, 2))
+  fs.writeFileSync(path.join(OUT_DIR, 'carriers.json'), JSON.stringify(carriers, null, 2))
+  fs.writeFileSync(path.join(OUT_DIR, 'routes.json'), JSON.stringify(routes.slice(0, 2000), null, 2))
   fs.writeFileSync(path.join(OUT_DIR, 'periodOptions.json'), JSON.stringify(periodOptions, null, 2))
 
   console.log('Wrote:', path.join(OUT_DIR, 'airlines.json'), airlines.length, 'airlines')
   console.log('Wrote:', path.join(OUT_DIR, 'airports.json'), airports.length, 'airports')
-  console.log('Wrote:', path.join(OUT_DIR, 'routes.json'), routes.length, 'routes')
+  console.log('Wrote:', path.join(OUT_DIR, 'carriers.json'), carriers.length, 'carriers')
+  console.log('Wrote:', path.join(OUT_DIR, 'routes.json'), Math.min(2000, routes.length), 'routes')
   console.log('Wrote:', path.join(OUT_DIR, 'periodOptions.json'), periodOptions.length, 'period options')
 }
 

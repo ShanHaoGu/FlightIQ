@@ -20,10 +20,13 @@ export default function RouteCard({ route, isSelected, onClick }) {
       {(from || to) && (from !== fromCode || to !== toCode) && (
         <div className="route-card-meta">{from} → {to}</div>
       )}
+      {route.carrierName && (
+        <div className="route-card-meta route-carrier">{route.carrierName}</div>
+      )}
       <div className="route-card-metrics">
-        {onTimePct != null && <span>准点率 {onTimePct}%</span>}
-        {delayRate != null && <span>延误率 {delayRate}%</span>}
-        {flightCount != null && <span>航班量 {flightCount}</span>}
+        {onTimePct != null && <span>On-time {onTimePct}%</span>}
+        {delayRate != null && <span>Delay {delayRate}%</span>}
+        {flightCount != null && <span>Flights {flightCount}</span>}
       </div>
     </article>
   )

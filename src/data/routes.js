@@ -1,22 +1,26 @@
 /**
- * 航线评分逻辑（多因素 + 评分构成）
- * 因素：准点率、航班量等级、月度稳定性（各月航班量波动，用于预测评分）
+ * Route scoring (multi-factor + breakdown).
+ * Factors: on-time %, flight volume tier, monthly stability, baggage mishandled rate, fleet age (carrier-level).
  */
 
 export const WEIGHTS = {
-  onTimePct: 0.6,
-  flightVolume: 0.2,
-  monthlyStability: 0.2
+  onTimePct: 0.45,
+  flightVolume: 0.18,
+  monthlyStability: 0.12,
+  baggageRate: 0.15,
+  fleetAge: 0.1
 }
 
-/** 选择具体月份时提高当月航班量权重，使评分随月份明显变化 */
+/** When a specific month is selected, increase that month’s flight volume weight */
 export const WEIGHTS_BY_MONTH = {
-  onTimePct: 0.5,
-  flightVolume: 0.35,
-  monthlyStability: 0.15
+  onTimePct: 0.4,
+  flightVolume: 0.28,
+  monthlyStability: 0.08,
+  baggageRate: 0.14,
+  fleetAge: 0.1
 }
 
-/** 根据各月航班量波动计算稳定性得分 0–100（波动越小越稳定，得分越高） */
+/** Stability score 0–100 from monthly flight count variance (lower variance = higher score) */
 function monthlyStabilityScore(periods) {
   if (!Array.isArray(periods) || periods.length < 2) return null
   const counts = periods.map(p => p.flightCount).filter(n => n != null)
@@ -29,7 +33,7 @@ function monthlyStabilityScore(periods) {
   return Math.max(0, score)
 }
 
-/** 根据航班量在全体中的分位计算 0–100 分（航班越多越稳定，得分越高） */
+/** Flight volume score 0–100 by percentile (more flights = higher score) */
 function flightVolumeScore(flightCount, allCounts) {
   if (flightCount == null || !Array.isArray(allCounts) || allCounts.length === 0) return null
   const sorted = [...allCounts].filter(n => n != null).sort((a, b) => b - a)
@@ -39,27 +43,45 @@ function flightVolumeScore(flightCount, allCounts) {
   return Math.round(20 + percentile * 80)
 }
 
-/** 准点率直接作为 0–100 分 */
+/** On-time rate as 0–100 score */
 function onTimeScore(onTimePct) {
   if (onTimePct == null) return null
   return Math.round(Math.min(100, Math.max(0, onTimePct)))
 }
 
+/** Baggage mishandled per 100: lower is better, scaled to 0–100 (gentler curve so scores are less harsh) */
+function baggageScore(mishandledPer100) {
+  if (mishandledPer100 == null || typeof mishandledPer100 !== 'number') return null
+  const score = Math.round(100 - Math.min(100, mishandledPer100 * 60))
+  return Math.max(0, score)
+}
+
+/** Fleet average age (years): lower is better; gentler curve so older fleets get higher scores */
+function fleetAgeScore(avgAgeYears) {
+  if (avgAgeYears == null || typeof avgAgeYears !== 'number' || avgAgeYears < 0) return null
+  const score = Math.round(100 - Math.min(100, avgAgeYears * 3))
+  return Math.max(0, score)
+}
+
 /**
- * 计算综合分与评分构成
- * @param {Object} route - 含 onTimePct, flightCount 或 totalFlightCount
- * @param {number[]} [allFlightCounts] - 当前列表下所有航线的航班量，用于航班量得分分位
- * @param {boolean} [byMonth] - 是否按所选月份计分（提高当月航班量权重，评分随月份变化）
+ * Compute composite score and breakdown.
+ * @param {Object} route - has onTimePct, flightCount or totalFlightCount
+ * @param {number[]} [allFlightCounts] - all route flight counts for percentile
+ * @param {boolean} [byMonth] - use month-weighted weights when a month is selected
  */
 export function calcScore(route, allFlightCounts = [], byMonth = false) {
   const onTime = onTimeScore(route.onTimePct)
   const flightCount = route.flightCount != null ? route.flightCount : route.totalFlightCount
   const flight = flightVolumeScore(flightCount, allFlightCounts)
   const stability = monthlyStabilityScore(route.periods || [])
+  const baggage = baggageScore(route.baggageMishandledPer100)
+  const fleetAge = fleetAgeScore(route.fleetAgeYears)
   const hasOnTime = onTime != null
   const hasFlight = flight != null
   const hasStability = stability != null
-  if (!hasOnTime && !hasFlight && !hasStability) return { score: null, grade: getGrade(null), breakdown: null }
+  const hasBaggage = baggage != null
+  const hasFleetAge = fleetAge != null
+  if (!hasOnTime && !hasFlight && !hasStability && !hasBaggage && !hasFleetAge) return { score: null, grade: getGrade(null), breakdown: null }
   const w = byMonth ? WEIGHTS_BY_MONTH : WEIGHTS
   let total = 0
   let totalWeight = 0
@@ -68,41 +90,67 @@ export function calcScore(route, allFlightCounts = [], byMonth = false) {
     total += onTime * w.onTimePct
     totalWeight += w.onTimePct
     breakdown.push({
-      name: '准点率',
+      name: 'On-time %',
       value: route.onTimePct,
       unit: '%',
       score: onTime,
       weight: w.onTimePct,
       contribution: Math.round(onTime * w.onTimePct * 10) / 10,
-      desc: '起降机场准点率平均值，越高越好'
+      desc: route.carrier ? 'On-time rate for this airline on this route.' : 'Average on-time at origin/destination airports; higher is better.'
     })
   }
   if (hasFlight) {
     total += flight * w.flightVolume
     totalWeight += w.flightVolume
-    const tier = flight >= 80 ? '高' : flight >= 50 ? '中' : '低'
+    const tier = flight >= 80 ? 'High' : flight >= 50 ? 'Medium' : 'Low'
     breakdown.push({
-      name: '航班量',
+      name: 'Flight volume',
       value: flightCount,
-      unit: '班',
+      unit: ' flights',
       score: flight,
       weight: w.flightVolume,
       contribution: Math.round(flight * w.flightVolume * 10) / 10,
-      desc: `航班量等级：${tier}（当前筛选周期）`
+      desc: `Flight volume tier: ${tier} (current filter period).`
     })
   }
   if (hasStability) {
     total += stability * w.monthlyStability
     totalWeight += w.monthlyStability
-    const tier = stability >= 80 ? '高' : stability >= 50 ? '中' : '低'
+    const tier = stability >= 80 ? 'High' : stability >= 50 ? 'Medium' : 'Low'
     breakdown.push({
-      name: '月度稳定性',
+      name: 'Monthly stability',
       value: (route.periods || []).length,
-      unit: '个月',
+      unit: ' months',
       score: stability,
       weight: w.monthlyStability,
       contribution: Math.round(stability * w.monthlyStability * 10) / 10,
-      desc: `各月航班量波动：${tier}（基于 1–12 月历史，波动小更易预测）`
+      desc: `Month-to-month flight volume variation: ${tier} (based on 1–12 month history; less variation = more predictable).`
+    })
+  }
+  if (hasBaggage) {
+    total += baggage * w.baggageRate
+    totalWeight += w.baggageRate
+    breakdown.push({
+      name: 'Baggage mishandled',
+      value: route.baggageMishandledPer100,
+      unit: '/100 bags',
+      score: baggage,
+      weight: w.baggageRate,
+      contribution: Math.round(baggage * w.baggageRate * 10) / 10,
+      desc: 'Carrier-level: mishandled bags per 100 enplaned (DOT ATCR); lower is better.'
+    })
+  }
+  if (hasFleetAge) {
+    total += fleetAge * w.fleetAge
+    totalWeight += w.fleetAge
+    breakdown.push({
+      name: 'Fleet age',
+      value: route.fleetAgeYears,
+      unit: ' yr',
+      score: fleetAge,
+      weight: w.fleetAge,
+      contribution: Math.round(fleetAge * w.fleetAge * 10) / 10,
+      desc: 'Carrier-level: average fleet age (BTS Form 41); lower age = higher score.'
     })
   }
   const score = totalWeight > 0 ? Math.round(total / totalWeight) : null
@@ -113,30 +161,39 @@ export function calcScore(route, allFlightCounts = [], byMonth = false) {
   }
 }
 
-/** 根据分数返回等级 */
+/** Grade: 85+ = Excellent; 80–84, 70–79, 60–69, <60 with distinct colors */
 export function getGrade(score) {
   if (score == null) return { label: '—', color: 'var(--text-muted)' }
-  if (score >= 85) return { label: '优秀', color: 'var(--good)' }
-  if (score >= 70) return { label: '良好', color: 'var(--accent)' }
-  if (score >= 55) return { label: '一般', color: 'var(--warn)' }
-  return { label: '较差', color: 'var(--bad)' }
+  if (score >= 85) return { label: 'Excellent', color: 'var(--score-excellent)' }
+  if (score >= 80) return { label: 'Great', color: 'var(--score-great)' }
+  if (score >= 70) return { label: 'Good', color: 'var(--score-good)' }
+  if (score >= 60) return { label: 'Fair', color: 'var(--score-fair)' }
+  return { label: 'Poor', color: 'var(--score-poor)' }
 }
 
 /**
- * 为航线列表附加 score、grade、scoreBreakdown
+ * Attach score, grade, scoreBreakdown to route list.
  * @param {Object[]} rawList
- * @param {Object} [period] - { year, month } 筛选周期，用于取该周期航班量；有值时评分按「当月」权重计算
+ * @param {Object} [period] - { year, month } for flight count; when set, scoring uses month-weighted weights.
  */
 export function processRoutes(rawList, period = null) {
   if (!Array.isArray(rawList) || rawList.length === 0) return []
   const byMonth = !!(period && period.year && period.month)
   const withFlightCount = rawList.map(r => {
     let flightCount = r.totalFlightCount ?? r.flightCount
+    let onTimePct = r.onTimePct
+    let delayRate = r.delayRate
+    let cancelRate = r.cancelRate
     if (period && r.periods && r.periods.length) {
       const p = r.periods.find(x => x.year === period.year && x.month === period.month)
-      if (p) flightCount = p.flightCount
+      if (p) {
+        flightCount = p.flightCount
+        if (p.onTimePct != null) onTimePct = p.onTimePct
+        if (p.delayRate != null) delayRate = p.delayRate
+        if (p.cancelRate != null) cancelRate = p.cancelRate
+      }
     }
-    return { ...r, flightCount }
+    return { ...r, flightCount, onTimePct, delayRate, cancelRate }
   })
   const allCounts = withFlightCount.map(r => r.flightCount)
   return withFlightCount.map((r, i) => {

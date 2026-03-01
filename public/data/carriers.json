@@ -1,0 +1,86 @@
+[
+  {
+    "code": "9E",
+    "name": "Endeavor Air"
+  },
+  {
+    "code": "AA",
+    "name": "American Airlines"
+  },
+  {
+    "code": "AS",
+    "name": "Alaska Airlines"
+  },
+  {
+    "code": "B6",
+    "name": "JetBlue Airways"
+  },
+  {
+    "code": "C5",
+    "name": "C5"
+  },
+  {
+    "code": "DL",
+    "name": "Delta Air Lines"
+  },
+  {
+    "code": "F9",
+    "name": "Frontier Airlines"
+  },
+  {
+    "code": "G4",
+    "name": "Allegiant Air"
+  },
+  {
+    "code": "G7",
+    "name": "G7"
+  },
+  {
+    "code": "HA",
+    "name": "Hawaiian Airlines"
+  },
+  {
+    "code": "MQ",
+    "name": "Envoy Air"
+  },
+  {
+    "code": "NK",
+    "name": "Spirit Airlines"
+  },
+  {
+    "code": "OH",
+    "name": "PSA Airlines"
+  },
+  {
+    "code": "OO",
+    "name": "SkyWest Airlines"
+  },
+  {
+    "code": "PT",
+    "name": "PT"
+  },
+  {
+    "code": "QX",
+    "name": "Horizon Air"
+  },
+  {
+    "code": "UA",
+    "name": "United Airlines"
+  },
+  {
+    "code": "WN",
+    "name": "Southwest Airlines"
+  },
+  {
+    "code": "YV",
+    "name": "Mesa Airlines"
+  },
+  {
+    "code": "YX",
+    "name": "Republic Airways"
+  },
+  {
+    "code": "ZW",
+    "name": "ZW"
+  }
+]

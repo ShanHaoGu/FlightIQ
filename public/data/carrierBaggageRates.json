@@ -1,0 +1,20 @@
+{
+  "source": "DOT Air Travel Consumer Report, Mishandled Baggage (Nov 2025, per 100 enplaned)",
+  "unit": "per 100 bags enplaned",
+  "rates": {
+    "G4": 0.11,
+    "B6": 0.30,
+    "WN": 0.33,
+    "DL": 0.37,
+    "OH": 0.37,
+    "NK": 0.39,
+    "OO": 0.39,
+    "F9": 0.40,
+    "AS": 0.47,
+    "YX": 0.48,
+    "HA": 0.55,
+    "UA": 0.56,
+    "MQ": 0.60,
+    "AA": 0.62
+  }
+}

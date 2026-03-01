@@ -1,7 +1,7 @@
 import './RouteDetail.css'
 
 export default function RouteDetail({ route, onClose }) {
-  const { from, to, fromCode, toCode, onTimePct, delayRate, flightCount, totalFlightCount, score, grade, scoreBreakdown } = route
+  const { from, to, fromCode, toCode, carrierName, onTimePct, delayRate, cancelRate, flightCount, totalFlightCount, score, grade, scoreBreakdown } = route
   const count = flightCount ?? totalFlightCount
   const formulaText = scoreBreakdown?.length
     ? scoreBreakdown.map(b => `${b.name}×${(b.weight * 100).toFixed(0)}%`).join(' + ')
@@ -11,11 +11,12 @@ export default function RouteDetail({ route, onClose }) {
     <aside className="detail">
       <div className="detail-header">
         <h2 className="detail-title">{fromCode || from} → {toCode || to}</h2>
-        <button type="button" className="detail-close" onClick={onClose} aria-label="关闭">×</button>
+        <button type="button" className="detail-close" onClick={onClose} aria-label="Close">×</button>
       </div>
       {(from || to) && (
         <p className="detail-airline">{from} → {to}</p>
       )}
+      {carrierName && <p className="detail-carrier">Airline: {carrierName}</p>}
       {score != null && (
         <div className="detail-score-box">
           <span className="detail-score-num" style={{ color: grade?.color }}>{score}</span>
@@ -25,10 +26,10 @@ export default function RouteDetail({ route, onClose }) {
 
       {scoreBreakdown && scoreBreakdown.length > 0 && (
         <div className="detail-section">
-          <h3>评分构成</h3>
+          <h3>Score breakdown</h3>
           {formulaText && (
             <p className="detail-formula">
-              综合分 = {formulaText}
+              Score = {formulaText}
             </p>
           )}
           <ul className="breakdown-list">
@@ -38,28 +39,32 @@ export default function RouteDetail({ route, onClose }) {
                   <span className="breakdown-name">{b.name}</span>
                   <span className="breakdown-value">{b.value}{b.unit}</span>
                 </div>
+                <div className="breakdown-bar" role="presentation" aria-hidden>
+                  <div className="breakdown-bar-fill" style={{ width: `${b.score != null ? b.score : 0}%` }} />
+                </div>
                 <div className="breakdown-desc">{b.desc}</div>
                 <div className="breakdown-math">
-                  得分 {b.score} × 权重 {b.weight * 100}% = <strong>{b.contribution}</strong> 分
+                  Score {b.score} × weight {b.weight * 100}% = <strong>{b.contribution}</strong> pts
                 </div>
               </li>
             ))}
           </ul>
           <div className="breakdown-total">
-            综合分 = {scoreBreakdown.map(b => b.contribution).join(' + ')} ≈ <strong>{score}</strong> 分
+            Score = {scoreBreakdown.map(b => b.contribution).join(' + ')} ≈ <strong>{score}</strong> pts
           </div>
         </div>
       )}
 
       <div className="detail-section">
-        <h3>数据说明</h3>
+        <h3>Data</h3>
         <ul className="detail-facts">
-          {onTimePct != null && <li>准点率：<strong>{onTimePct}%</strong>（年度机场数据，不随所选月份变化）</li>}
-          {delayRate != null && <li>延误率：<strong>{delayRate}%</strong></li>}
-          {count != null && <li>航班量：<strong>{count}</strong> 班（当前所选月份）</li>}
+          {onTimePct != null && <li>On-time: <strong>{onTimePct}%</strong></li>}
+          {delayRate != null && <li>Delay rate (≥15 min): <strong>{delayRate}%</strong></li>}
+          {cancelRate != null && <li>Cancellation rate: <strong>{cancelRate}%</strong></li>}
+          {count != null && <li>Flights: <strong>{count}</strong> (selected month)</li>}
         </ul>
         <p className="detail-note">
-          准点率来自 Table 4 年度机场数据，不随月份变化。航班量随所选月份变化；选择某月后评分会按当月航班量重新计算（当月航班量权重更高）。
+          {route.carrier ? 'On-time, delay, and cancellation rates are from this airline on this route.' : 'On-time is from annual airport data.'} Flight count varies by selected month; score is recalculated with that month’s weight.
         </p>
       </div>
     </aside>
